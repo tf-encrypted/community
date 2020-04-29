@@ -6,40 +6,79 @@
 | **Author(s)** | Jason Mancuso (jason@capeprivacy.com)                |
 | **Sponsor**   | Michael Reneer (michaelreneer@google.com)            |
 | **Updated**   | YYYY-MM-DD  (TODO)                                   |
-| **Obsoletes** | TF-RFC it replaces, else remove this header          |
 
 ## Objective
 
-What are we doing and why? What problem will this solve? What are the goals and
-non-goals? This is your executive summary; keep it short, elaborate below.
-Add an explicit placement for Aggregators to the TensorFlow Federated Core.
+This document proposes adding an explicit `tff.AGGREGATORS` placement to the
+Federated Core (FC) in TensorFlow Federated (TFF). This would allow users to express
+custom aggregation protocols directly in TFF without adding unnecessary
+assumptions about where aggregation functions must be placed and computed.
 
 ## Motivation
 
-Why this is a valuable problem to solve? What background information is needed
-to show how this design addresses the problem?
+*Why this is a valuable problem to solve? What background information is needed
+to show how this design addresses the problem?*
 
-Which users are affected by the problem? Why is it a problem? What data supports
-this? What related work exists?
+When approaching federated learning with an eye for security or privacy, it is
+useful to divide federated computation into two categories: computations performing
+aggregations, and computations performing on-device computation.  Security and
+privacy issues tend to show up during the aggregation phase. This is particularly
+clear when looking at common methods of adding security guarantees to traditional,
+parameter-server style federated learning, for example with secure aggregation or
+differentially private federated averaging (DP-FedAvg).
+
+In security-heightened settings, it is often worthwhile to separate computation
+done in this aggregation phase from computation performed by the server in the
+traditional parameter server setup. This amounts to delegating aggregations to a
+third-party service. For example, when the clients are mistrustful of the server,
+aggregations might be delegated to a trusted execution environment or to  a cluster
+of machines engaging in a secure multi-party computation protocol. Another example
+is secure aggregation in the
+[Encode-Shuffle-Analyze (ESA)](https://arxiv.org/abs/1710.00901)
+model, which in a federated context generally assumes an additional
+party to perform the secure shuffling needed to realize a differential privacy
+guarantee. Since this is an established area of the literature with strong
+motivations and results, we see this as an important line of work for TFF to
+support in order to keep with its
+[project goals](https://github.com/tensorflow/federated#tensorflow-federated).
+
+In general, any secure aggregation protocol can be represented as a coordinated
+computation between three groups of parties: a server, a (potentially singleton)
+set of aggregators, and a set of clients. Note that these need not be mutually
+exclusive, so for example the traditional parameter server setting can be recovered
+as a special case by treating the server as a singleton aggregators set.
+
+The TFF Federated Core (FC) language currently realizes logically-distinct parties
+as "placements". While there exist `tff.SERVER` and `tff.CLIENTS` placements in FC,
+there is no `tff.AGGREGATORS` placement. Without such a placement, implementing new
+aggregation protocols in TFF can require low-level programming of the TFF executor
+stacks, as evidenced by
+[this community attempt to integrate secure aggregation](https://github.com/tf-encrypted/rfcs/blob/master/20190924-tensorflow-federated/integration-strategies.md).
+By adding a `tff.AGGREGATORS` placement, users can more easily implement new
+aggregation protocols by expressing them as federated computations in FC.
 
 ## User Benefit
 
-How will users (or other contributors) benefit from this work? What would be the
-headline in the release notes or blog post?
+*How will users (or other contributors) benefit from this work? What would be the
+headline in the release notes or blog post?*
+
+Users can now express custom aggregation protocols in the Federated Core by working
+with federated data placed on `tff.AGGREGATORS`. Users will be unencumbered by the
+constraints of the current federated types in FC.
 
 ## Design Proposal
 
-This is the meat of the document, where you explain your proposal. If you have
+*This is the meat of the document, where you explain your proposal. If you have
 multiple alternatives, be sure to use sub-sections for better separation of the
 idea, and list pros/cons to each approach. If there are alternatives that you
 have eliminated, you should also list those here, and explain why you believe
 your chosen approach is superior.
 
-Make sure you’ve thought through and addressed the following sections. If a section is not relevant to your specific proposal, please explain why, e.g. your RFC addresses a convention or process, not an API.
+Make sure you’ve thought through and addressed the following sections. If a section is not relevant to your specific proposal, please explain why, e.g. your RFC addresses a convention or process, not an API.*
 
 
 ### Alternatives Considered
-* Make sure to discuss the relative merits of alternatives to your proposal.
+A lower effort alternative might be to expect users to write custom executors, or custom executor stacks, to include additional "aggregator" parties when executing intrinisics. AGGREGATORS would stay outside of the FC type system, but could be sill be included in federated computations. This allows library designers to extend TFF for their own use cases. This is a major disadvantage, since users are only expected to be familiar with TFF Federated Learning (FL) or FC APIs, and this is a feature that would be useful to the majority of TFF users.
 
 ### Performance Implications
 * Do you expect any (speed / memory)? How will you confirm?
